@@ -21,7 +21,16 @@ function load_config()
         {
             if ( substr(strrchr($file,'.'),1) == "php")
             {
-                $CI->lang->load( str_replace( '_lang.php', '', $file ) );    
+            	if (file_exists('./application/language/en/' . $file))
+				{
+					include('./application/language/en/' . $file);
+				}
+				if (isset($lang)) {
+					$CI->lang->language = array_merge($CI->lang->language, $lang);
+					unset ($lang);
+				}
+                $CI->lang->load( str_replace( '_lang.php', '', $file ) );  
+
             }
         }
     }
