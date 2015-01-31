@@ -23,6 +23,6 @@ function to_currency($number)
 
 function to_currency_no_money($number)
 {
-	return number_format($number, 2, ',', '.');
+	return number_format($number, 2, '.', '');
 }
 ?>
