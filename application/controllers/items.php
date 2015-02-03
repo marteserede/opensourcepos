@@ -13,7 +13,7 @@ class Items extends Secure_area implements iData_controller
 	{
 		$config['base_url'] = site_url('/items/index');
 		$config['total_rows'] = $this->Item->count_all();
-		$config['per_page'] = '20';
+		$config['per_page'] = '2000';
 		$config['uri_segment'] = 3;
 		$this->pagination->initialize($config);
 		
