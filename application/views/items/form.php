@@ -1,16 +1,17 @@
 <div id="required_fields_message"><?php echo $this->lang->line('common_fields_required_message'); ?></div>
-<ul id="error_message_box"></ul>
+<ul id="error_message_box" class="error_message_box"></ul>
 <?php
-echo form_open('items/save/'.$item_info->item_id,array('id'=>'item_form'));
+echo form_open('items/save/'.$item_info->item_id,array('id'=>'item_form', 'enctype'=>'multipart/form-data'));
 ?>
 <fieldset id="item_basic_info">
 <legend><?php echo $this->lang->line("items_basic_information"); ?></legend>
 
 <div class="field_row clearfix">
-<?php echo form_label($this->lang->line('items_item_number').':', 'name',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('items_item_number').':', 'item_number',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'item_number',
+		'class'=>'item_number',
 		'id'=>'item_number',
 		'value'=>$item_info->item_number)
 	);?>
@@ -168,6 +169,13 @@ foreach($stock_locations as $key=>$location_detail)
 		'cols'=>'17')
 	);?>
 	</div>
+</div>
+
+<div class="field_row clearfix">
+<?php echo form_label($this->lang->line('items_image').':', 'item_image',array('class'=>'wide')); ?>
+    <div class='form_field'>
+        <?php echo form_upload('item_image');?>
+    </div>
 </div>
 
 <div class="field_row clearfix">
@@ -365,8 +373,8 @@ if($this->config->item('custom10_name') != NULL)
 
 <?php
 echo form_submit(array(
-	'name'=>'submit',
-	'id'=>'submit',
+	'name'=>'submit_form',
+	'id'=>'submit_form',
 	'value'=>$this->lang->line('common_submit'),
 	'class'=>'submit_button float_right')
 );
@@ -380,67 +388,45 @@ echo form_close();
 //validation and submit handling
 $(document).ready(function()
 {
-	$("#category").autocomplete("<?php echo site_url('items/suggest_category');?>",{max:100,minChars:0,delay:10});
-    $("#category").result(function(event, data, formatted){});
-	$("#category").search();
+	var no_op = function(event, data, formatted){};
+	$("#category").autocomplete("<?php echo site_url('items/suggest_category');?>",{max:100,minChars:0,delay:10}).result(no_op).search();
 
-	$("#custom1").autocomplete("<?php echo site_url('items/suggest_custom1');?>",{max:100,minChars:0,delay:10});
-    $("#custom1").result(function(event, data, formatted){});
-	$("#custom1").search();
+	<?php for ($i = 0; $i < 11; $i++) 
+	{ 
+	?>
+	$("#custom"+<?php echo $i; ?>).autocomplete("<?php echo site_url('items/suggest_custom'.$i);?>",{max:100,minChars:0,delay:10}).result(no_op).search();
+	<?php 
+	}
+	?>
 
-	$("#custom2").autocomplete("<?php echo site_url('items/suggest_custom2');?>",{max:100,minChars:0,delay:10});
-    $("#custom2").result(function(event, data, formatted){});
-	$("#custom2").search();
-
-	$("#custom3").autocomplete("<?php echo site_url('items/suggest_custom3');?>",{max:100,minChars:0,delay:10});
-    $("#custom3").result(function(event, data, formatted){});
-	$("#custom3").search();
-
-	$("#custom4").autocomplete("<?php echo site_url('items/suggest_custom4');?>",{max:100,minChars:0,delay:10});
-    $("#custom4").result(function(event, data, formatted){});
-	$("#custom4").search();
-
-	$("#custom5").autocomplete("<?php echo site_url('items/suggest_custom5');?>",{max:100,minChars:0,delay:10});
-    $("#custom5").result(function(event, data, formatted){});
-	$("#custom5").search();
-
-	$("#custom6").autocomplete("<?php echo site_url('items/suggest_custom6');?>",{max:100,minChars:0,delay:10});
-    $("#custom6").result(function(event, data, formatted){});
-	$("#custom6").search();
-
-	$("#custom7").autocomplete("<?php echo site_url('items/suggest_custom7');?>",{max:100,minChars:0,delay:10});
-    $("#custom7").result(function(event, data, formatted){});
-	$("#custom7").search();
-
-	$("#custom8").autocomplete("<?php echo site_url('items/suggest_custom8');?>",{max:100,minChars:0,delay:10});
-    $("#custom8").result(function(event, data, formatted){});
-	$("#custom8").search();
-
-	$("#custom9").autocomplete("<?php echo site_url('items/suggest_custom9');?>",{max:100,minChars:0,delay:10});
-    $("#custom9").result(function(event, data, formatted){});
-	$("#custom9").search();
-
-	$("#custom10").autocomplete("<?php echo site_url('items/suggest_custom10');?>",{max:100,minChars:0,delay:10});
-    $("#custom10").result(function(event, data, formatted){});
-	$("#custom10").search();
-/** END GARRISON ADDED **/
+	$.validator.addMethod("item_number", function(value, element) 
+	{
+		return JSON.parse($.ajax(
+		{
+			  type: 'POST',
+			  url: '<?php echo site_url($controller_name . "/check_item_number")?>',
+			  data: {'item_id' : '<?php echo $item_info->item_id; ?>', 'item_number' : $(element).val() },
+			  success: function(response) 
+			  {
+				  success=response.success;
+			  },
+			  async:false,
+			  dataType: 'json'
+        }).responseText).success;
+        
+    }, '<?php echo $this->lang->line("items_item_number_duplicate"); ?>');
 	
 	$('#item_form').validate({
 		submitHandler:function(form)
 		{
-			/*
-			make sure the hidden field #item_number gets set
-			to the visible scan_item_number value
-			*/
-			$('#item_number').val($('#scan_item_number').val());
 			$(form).ajaxSubmit({
-			success:function(response)
-			{
-				tb_remove();
-				post_item_form_submit(response);
-			},
-			dataType:'json'
-		});
+				success:function(response)
+				{
+					tb_remove();
+					post_item_form_submit(response);
+				},
+				dataType:'json'
+			});
 
 		},
 		errorLabelContainer: "#error_message_box",
@@ -449,6 +435,7 @@ $(document).ready(function()
 		{
 			name:"required",
 			category:"required",
+			item_number: { item_number: true },
 			cost_price:
 			{
 				required:true,

@@ -1,12 +1,11 @@
-<?php $this->load->view("partial/header"); ?>
-<div id="page_title"><?php echo $this->lang->line('module_config'); ?></div>
+<div id="page_title"><?php echo $this->lang->line('config_general_configuration'); ?></div>
 <?php
 echo form_open('config/save/',array('id'=>'config_form'));
 ?>
 <div id="config_wrapper">
 <fieldset id="config_info">
 <div id="required_fields_message"><?php echo $this->lang->line('common_fields_required_message'); ?></div>
-<ul id="error_message_box"></ul>
+<ul id="error_message_box" class="error_message_box"></ul>
 <legend><?php echo $this->lang->line("config_info"); ?></legend>
 
 <div class="field_row clearfix">	
@@ -96,7 +95,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 <!-- END MODIFIED -->
 
-<div class="field_row clearfix">	
+<div class="field_row clearfix">    
 <?php echo form_label($this->lang->line('config_number_format').':', 'number_format',array('class'=>'wide required')); ?>
 	<div class='form_field'>
 	<?php echo $this->lang->line('config_thousands_separator'); ?>
@@ -115,6 +114,26 @@ echo form_open('config/save/',array('id'=>'config_form'));
 		$this->config->item('decimal_point'));
 		?>
 	</div>
+</div>
+
+<div class="field_row clearfix">    
+<?php echo form_label($this->lang->line('config_sales_invoice_format').':', 'sales_invoice_format',array('class'=>'wide')); ?>
+    <div class='form_field'>
+    <?php echo form_input(array(
+        'name'=>'sales_invoice_format',
+        'id'=>'sales_invoice_format',
+        'value'=>$this->config->item('sales_invoice_format'))); ?>
+    </div>
+</div>
+
+<div class="field_row clearfix">    
+<?php echo form_label($this->lang->line('config_recv_invoice_format').':', 'recv_invoice_format',array('class'=>'wide')); ?>
+    <div class='form_field'>
+    <?php echo form_input(array(
+        'name'=>'recv_invoice_format',
+        'id'=>'recv_invoice_format',
+        'value'=>$this->config->item('recv_invoice_format'))); ?>
+    </div>
 </div>
 
 <div class="field_row clearfix">	
@@ -160,20 +179,20 @@ echo form_open('config/save/',array('id'=>'config_form'));
 	</div>
 </div>
 
-<div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_language').':', 'language',array('class'=>'wide required')); ?>
+<div class="field_row clearfix">
+	<?php echo form_label($this->lang->line('config_language').':', 'language',array('class'=>'wide required')); ?>
 	<div class='form_field'>
-	<?php echo form_dropdown('language', array(
-			'en'    => 'English',
-			'es'    => 'Spanish',
-			'ru'    => 'Russian',
-			'nl-BE'    => 'Dutch',
-			'zh'    => 'Chinese',
-			'id'    => 'Indonesian',
-			'fr'	=> 'French',
-			'th'	=> 'Thai',
-			'tr'	=> 'Turkish'
-			), 
+		<?php echo form_dropdown('language', array(
+		'en' => 'English',
+		'es' => 'Spanish',
+		'ru' => 'Russian',
+		'nl-BE' => 'Dutch',
+		'zh' => 'Chinese',
+		'id' => 'Indonesian',
+		'fr'	=> 'French',
+		'th'	=> 'Thai',
+		'tr'	=> 'Turkish'
+		),
 		$this->config->item('language'));
 		?>
 	</div>
@@ -280,67 +299,6 @@ echo form_open('config/save/',array('id'=>'config_form'));
 	</div>
 </div>
 
-<div id="stock_locations">
-	<?php $this->load->view('partial/stock_locations', array('stock_locations' => $stock_locations)); ?>
-</div>
-
-<div class="field_row clearfix">    
-<?php echo form_label($this->lang->line('config_sales_invoice_format').':', 'sales_invoice_format',array('class'=>'wide')); ?>
-    <div class='form_field'>
-    <?php echo form_input(array(
-        'name'=>'sales_invoice_format',
-        'id'=>'sales_invoice_format',
-        'value'=>$this->config->item('sales_invoice_format'))); ?>
-    </div>
-</div>
-
-<div class="field_row clearfix">    
-<?php echo form_label($this->lang->line('config_recv_invoice_format').':', 'recv_invoice_format',array('class'=>'wide')); ?>
-    <div class='form_field'>
-    <?php echo form_input(array(
-        'name'=>'recv_invoice_format',
-        'id'=>'recv_invoice_format',
-        'value'=>$this->config->item('recv_invoice_format'))); ?>
-    </div>
-</div>
-
-<div class="field_row clearfix">    
-<?php echo form_label($this->lang->line('config_barcode_content').':', 'barcode_content',array('class'=>'wide')); ?>
-    <div class='form_field'>
-    <?php echo form_radio(array(
-				'name'=>'barcode_content',
-				'value'=>'id',
-				'checked'=>$this->config->item('barcode_content') === "id")); ?>
-	<?php echo $this->lang->line('config_barcode_id'); ?>
-    <?php echo form_radio(array(
-				'name'=>'barcode_content',
-				'value'=>'number',
-				'checked'=>$this->config->item('barcode_content') === "number")); ?>
-	<?php echo $this->lang->line('config_barcode_number'); ?>
-    </div>
-</div>
-
-<div class="field_row clearfix">    
-<?php echo form_label($this->lang->line('config_barcode_labels').':', 'barcode_labels',array('class'=>'wide')); ?>
-    <div class='form_field'>
-     <?php echo form_checkbox(array(
-				'name'=>'barcode_label_company',
-     			'value'=>'barcode_label_company',
-				'checked'=>strstr($this->config->item('barcode_labels'), 'company'))); ?>
-	<?php echo $this->lang->line('config_barcode_company'); ?>
-    <?php echo form_checkbox(array(
-				'name'=>'barcode_label_name',
-    			'value'=>'barcode_label_name',
-				'checked'=>strstr($this->config->item('barcode_labels'), 'name'))); ?>
-	<?php echo $this->lang->line('config_barcode_name'); ?>
-    <?php echo form_checkbox(array(
-				'name'=>'barcode_label_price',
-    			'value'=>'barcode_label_price',
-				'checked'=>strstr($this->config->item('barcode_labels'), 'price'))); ?>
-	<?php echo $this->lang->line('config_barcode_price'); ?>
-    </div>
-</div>
-
 <div class="field_row clearfix">	
 <?php echo form_label($this->lang->line('config_print_after_sale').':', 'print_after_sale',array('class'=>'wide')); ?>
 	<div class='form_field'>
@@ -364,18 +322,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_tax_included').':', 'tax_included',array('class'=>'wide')); ?>
-	<div class='form_field'>
-	<?php echo form_checkbox(array(
-		'name'=>'tax_included',
-		'id'=>'tax_included',
-		'value'=>'tax_included',
-		'checked'=>$this->config->item('tax_included')));?>
-	</div>
-</div>
-
-<div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom1').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom1').':', 'config_custom1',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom1_name',
@@ -385,7 +332,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom2').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom2').':', 'config_custom2',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom2_name',
@@ -395,7 +342,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom3').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom3').':', 'config_custom3',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom3_name',
@@ -405,7 +352,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom4').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom4').':', 'config_custom4',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom4_name',
@@ -415,7 +362,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom5').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom5').':', 'config_custom5',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom5_name',
@@ -425,7 +372,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom6').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom6').':', 'config_custom6',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom6_name',
@@ -435,7 +382,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom7').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom7').':', 'config_custom7',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom7_name',
@@ -445,7 +392,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom8').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom8').':', 'config_custom8',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom8_name',
@@ -455,7 +402,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom9').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom9').':', 'config_custom9',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom9_name',
@@ -465,7 +412,7 @@ echo form_open('config/save/',array('id'=>'config_form'));
 </div>
 
 <div class="field_row clearfix">	
-<?php echo form_label($this->lang->line('config_custom10').':', 'website',array('class'=>'wide')); ?>
+<?php echo form_label($this->lang->line('config_custom10').':', 'config_custom10',array('class'=>'wide')); ?>
 	<div class='form_field'>
 	<?php echo form_input(array(
 		'name'=>'custom10_name',
@@ -473,6 +420,14 @@ echo form_open('config/save/',array('id'=>'config_form'));
 		'value'=>$this->config->item('custom10_name')));?>
 	</div>
 </div>
+
+<div class="field_row clearfix">	
+<?php echo form_label($this->lang->line('config_backup_database').':', 'config_backup_database',array('class'=>'wide')); ?>
+	<div id="backup_db" class="form_field small_button" style="background-color:transparent;">
+		<span style="top:22%;"><?php echo $this->lang->line('config_backup_button'); ?></span>
+	</div>
+</div>
+
 
 <?php 
 echo form_submit(array(
@@ -487,65 +442,15 @@ echo form_submit(array(
 <?php
 echo form_close();
 ?>
-<div id="feedback_bar"></div>
+
 <script type='text/javascript'>
 
 //validation and submit handling
 $(document).ready(function()
 {
-	var location_count = <?php echo sizeof($stock_locations); ?>;
-
-	var hide_show_remove = function() 
-	{
-		if ($("input[name*='stock_location']").length > 1)
-		{
-			$(".remove_stock_location").show();
-		} 
-		else
-		{
-			$(".remove_stock_location").hide();
-		}
-	};
-
-	hide_show_remove();
-
-	var add_stock_location = function() 
-	{
-		var id = $(this).parent().find('input').attr('id');
-		id = id.replace(/.*?_(\d+)$/g, "$1");
-		var block = $(this).parent().clone(true);
-		var new_block = block.insertAfter($(this).parent());
-		var new_block_id = 'stock_location_' + ++id;
-		$(new_block).find('label').html("<?php echo $this->lang->line('config_stock_location'); ?> " + ++location_count + ": ").attr('for', new_block_id);
-		$(new_block).find('input').attr('id', new_block_id).attr('name', new_block_id).val('');
-		$('.add_stock_location', new_block).click(add_stock_location);
-		$('.remove_stock_location', new_block).click(remove_stock_location);
-		hide_show_remove();
-	};
-
-	var remove_stock_location = function() 
-	{
-		$(this).parent().remove();
-		hide_show_remove();
-	};
-
-	var init_add_remove_locations = function() 
-	{
-		$('.add_stock_location').click(add_stock_location);
-		$('.remove_stock_location').click(remove_stock_location);
-	};
-	init_add_remove_locations();
-
-	var duplicate_found = false;
-	// run validator once for all fields
-	$.validator.addMethod('stock_location' , function(value, element) 
-	{
-		var value_count = 0;
-		$("input[name*='stock_location']").each(function() {
-			value_count = $(this).val() == value ? value_count + 1 : value_count; 
-		});
-		return value_count < 2;
-    }, "<?php echo $this->lang->line('config_stock_location_duplicate'); ?>");
+	$("#backup_db").click(function() {
+		window.location='<?php echo site_url('config/backup_db') ?>';
+	});
 	
 	$('#config_form').validate({
 		submitHandler:function(form)
@@ -561,7 +466,6 @@ $(document).ready(function()
 				{
 					set_feedback(response.message,'error_message',true);		
 				}
-				$("#stock_locations").load('<?php echo site_url("config/stock_locations");?>', init_add_remove_locations);
 			},
 			dataType:'json'
 		});
@@ -580,11 +484,7 @@ $(document).ready(function()
     			number:true
     		},
     		email:"email",
-    		return_policy: "required",
-    		stock_location: {
-        		required:true,
-				stock_location: true
-    		}
+    		return_policy: "required"    		
    		},
 		messages: 
 		{
@@ -597,10 +497,9 @@ $(document).ready(function()
     			number:"<?php echo $this->lang->line('config_default_tax_rate_number'); ?>"
     		},
      		email: "<?php echo $this->lang->line('common_email_invalid_format'); ?>",
-     		return_policy:"<?php echo $this->lang->line('config_return_policy_required'); ?>",
-     		stock_location:"<?php echo $this->lang->line('config_stock_location_required'); ?>" 
+     		return_policy:"<?php echo $this->lang->line('config_return_policy_required'); ?>"
+	
 		}
 	});
 });
 </script>
-<?php $this->load->view("partial/footer"); ?>
