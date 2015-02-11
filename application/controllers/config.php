@@ -5,22 +5,19 @@ class Config extends Secure_area
 	function __construct()
 	{
 		parent::__construct('config');
+		$this->load->library('barcode_lib');
 	}
 	
 	function index()
 	{
 		$location_names = array();
-		$stock_locations = $this->Stock_locations->get_all()->result_array();
-		$this->load->view("config", array('stock_locations' => $stock_locations));
+		$data['stock_locations'] = $this->Stock_locations->get_all()->result_array();
+		$data['support_barcode'] = $this->barcode_lib->get_list_barcodes();
+		$this->load->view("configs/manage", $data);
 	}
 		
 	function save()
 	{
-		$barcode_labels = preg_replace('/^_|barcode_label_|_$/', '', implode('_', array(
-				$this->input->post('barcode_label_name'), 
-				$this->input->post('barcode_label_price'), 
-				$this->input->post('barcode_label_company')
-		)));
 		$batch_save_data=array(
 		'company'=>$this->input->post('company'),
 		'address'=>$this->input->post('address'),
@@ -41,8 +38,6 @@ class Config extends Secure_area
         'tax_included'=>$this->input->post('tax_included'),
 		'recv_invoice_format'=>$this->input->post('recv_invoice_format'),
 		'sales_invoice_format'=>$this->input->post('sales_invoice_format'),
-		'barcode_labels'=>$barcode_labels,
-		'barcode_content'=>$this->input->post('barcode_content'),
 		'receiving_calculate_average_price'=>$this->input->post('receiving_calculate_average_price'),
 		'thousands_separator'=>$this->input->post('thousands_separator'),
 		'decimal_point'=>$this->input->post('decimal_point'),
@@ -58,31 +53,9 @@ class Config extends Secure_area
 		'custom10_name'=>$this->input->post('custom10_name')/**GARRISON ADDED 4/20/2013**/
 		);
 		
-		$deleted_locations = $this->Stock_locations->get_allowed_locations();
-		foreach($this->input->post() as $key => $value) 
-		{
-        	if (strstr($key, 'stock_location'))
-        	{
-      			$location_id = preg_replace("/.*?_(\d+)$/", "$1", $key);
-      			unset($deleted_locations[$location_id]);
-        		// save or update
-      			$location_data = array('location_name' => $value);
-        		if ($this->Stock_locations->save($location_data, $location_id))
-        		{
-        			$this->_clear_session_state();
-        		}
-        	}
-		}
-        // all locations not available in post will be deleted now
-        foreach ($deleted_locations as $location_id => $location_name)
-        {
-        	$this->Stock_locations->delete($location_id);
-        }
-        
-		if( $this->Appconfig->batch_save( $batch_save_data ))
-		{
-			echo json_encode(array('success'=>true,'message'=>$this->lang->line('config_saved_successfully')));
-		}
+		$result = $this->Appconfig->batch_save( $batch_save_data );
+		$success = $result ? true : false;
+		echo json_encode(array('success'=>$success,'message'=>$this->lang->line('config_saved_' . ($success ? '' : 'un') . 'successfully')));
 		$this->_remove_duplicate_cookies();	
 	}
 	
@@ -102,5 +75,85 @@ class Config extends Secure_area
 		$this->receiving_lib->clear_stock_destination();
 		$this->receiving_lib->clear_all();
 	}
+	
+	function save_locations() 
+	{
+		$this->db->trans_start();
+		
+		$deleted_locations = $this->Stock_locations->get_allowed_locations();
+		foreach($this->input->post() as $key => $value)
+		{
+			if (strstr($key, 'stock_location'))
+			{
+				$location_id = preg_replace("/.*?_(\d+)$/", "$1", $key);
+				unset($deleted_locations[$location_id]);
+				// save or update
+				$location_data = array('location_name' => $value);
+				if ($this->Stock_locations->save($location_data, $location_id))
+				{
+					$this->_clear_session_state();
+				}
+			}
+		}
+		// all locations not available in post will be deleted now
+		foreach ($deleted_locations as $location_id => $location_name)
+		{
+			$this->Stock_locations->delete($location_id);
+		}
+		$success = $this->db->trans_complete();
+		echo json_encode(array('success'=>$success,'message'=>$this->lang->line('config_saved_' . ($success ? '' : 'un') . 'successfully')));
+		$this->_remove_duplicate_cookies();
+	}
+
+    function save_barcode()
+    {
+        $batch_save_data=array(
+        'barcode_type'=>$this->input->post('barcode_type'),
+        'barcode_quality'=>$this->input->post('barcode_quality'),
+        'barcode_width'=>$this->input->post('barcode_width'),
+        'barcode_height'=>$this->input->post('barcode_height'),
+        'barcode_font'=>$this->input->post('barcode_font'),
+        'barcode_font_size'=>$this->input->post('barcode_font_size'),
+        'barcode_first_row'=>$this->input->post('barcode_first_row'),
+        'barcode_second_row'=>$this->input->post('barcode_second_row'),
+        'barcode_third_row'=>$this->input->post('barcode_third_row'),
+        'barcode_num_in_row'=>$this->input->post('barcode_num_in_row'),
+        'barcode_page_width'=>$this->input->post('barcode_page_width'),
+        'barcode_page_cellspacing'=>$this->input->post('barcode_page_cellspacing'),
+        'barcode_content'=>$this->input->post('barcode_content'),
+        );
+        
+        $result = $this->Appconfig->batch_save( $batch_save_data );
+        $success = $result ? true : false;
+        echo json_encode(array('success'=>$success, 'message'=>$this->lang->line('config_saved_' . ($success ? '' : 'un') . 'successfully')));
+        
+    }
+    
+    function backup_db()
+    {
+    	$employee_id=$this->Employee->get_logged_in_employee_info()->person_id;
+    	if($this->Employee->has_module_grant('config',$employee_id))
+    	{
+    		$this->load->dbutil();
+    		$prefs = array(
+    				'format'      => 'zip',
+    				'filename'    => 'ospos.sql'
+    		);
+    		 
+    		$backup =& $this->dbutil->backup($prefs);
+    		 
+			$file_name =  'ospos-' . date("Y-m-d-H-i-s") .'.zip';
+    		$save = 'uploads/'.$file_name;
+    		$this->load->helper('download');
+    		while (ob_get_level()) {
+    			ob_end_clean();
+    		}
+    		force_download($file_name, $backup);
+    	}
+    	else 
+    	{
+    		redirect('no_access/config');
+    	}
+    }
 }
-?>
+?> 

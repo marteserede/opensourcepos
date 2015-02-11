@@ -67,6 +67,34 @@ class Items extends Secure_area implements iData_controller
 		echo $data_rows;
 		$this->_remove_duplicate_cookies();
 	}
+	
+	function pic_thumb($pic_id)
+	{
+		$this->load->helper('file');
+		$this->load->library('image_lib');
+		$base_path = "uploads/item_pics/" . $pic_id ;
+		$images = glob ($base_path. "*");
+		if (sizeof($images) > 0)
+		{
+			$image_path = $images[0];
+			$ext = pathinfo($image_path, PATHINFO_EXTENSION);
+			$thumb_path = $base_path . $this->image_lib->thumb_marker.'.'.$ext;
+			if (sizeof($images) < 2)
+			{
+				$config['image_library'] = 'gd2';
+				$config['source_image']  = $image_path;
+				$config['maintain_ratio'] = TRUE;
+				$config['create_thumb'] = TRUE;
+				$config['width'] = 52;
+				$config['height'] = 32;
+ 				$this->image_lib->initialize($config);
+ 				$image = $this->image_lib->resize();
+				$thumb_path = $this->image_lib->full_dst_path;
+			}
+			$this->output->set_content_type(get_mime_by_extension($thumb_path));
+			$this->output->set_output(file_get_contents($thumb_path));
+		}
+	}
 
 	/*
 	Gives search suggestions based on what is being searched for
@@ -268,17 +296,14 @@ class Items extends Secure_area implements iData_controller
 
 	function generate_barcodes($item_ids)
 	{
+		$this->load->library('barcode_lib');
 		$result = array();
 
 		$item_ids = explode(':', $item_ids);
-		foreach ($item_ids as $item_id)
-		{
-			$item_info = $this->Item->get_info($item_id);
-
-			$result[] = array('name' =>$item_info->name, 'id'=> $item_id, 'item_number'=> $item_info->item_number, 'unit_price'=>$item_info->unit_price);
-		}
+		$result = $this->Item->get_multiple_info($item_ids)->result_array();
 
 		$data['items'] = $result;
+		$data['barcode_config'] = $this->barcode_lib->get_barcode_config();
 		$this->load->view("barcode_sheet", $data);
 	}
 
@@ -305,6 +330,8 @@ class Items extends Secure_area implements iData_controller
 
 	function save($item_id=-1)
 	{
+		$upload_success = $this->_handle_image_upload();
+		$upload_data = $this->upload->data();
         //Save item data
 		$item_data = array(
 		'name'=>$this->input->post('name'),
@@ -331,24 +358,23 @@ class Items extends Secure_area implements iData_controller
 		'custom10'=>$this->input->post('custom10')/**GARRISON ADDED 4/21/2013**/
 		);
 		
+		if (!empty($upload_data['orig_name']))
+		{
+			$item_data['pic_id'] = $upload_data['raw_name'];
+		}
+		
 		$employee_id=$this->Employee->get_logged_in_employee_info()->person_id;
 		$cur_item_info = $this->Item->get_info($item_id);
-
-		$new_item = FALSE;
+		
 		if($this->Item->save($item_data,$item_id))
 		{
+			$success = TRUE;
+			$new_item = FALSE;
 			//New item
 			if($item_id==-1)
 			{
-				echo json_encode(array('success'=>true,'message'=>$this->lang->line('items_successful_adding').' '.
-				$item_data['name'],'item_id'=>$item_data['item_id']));
 				$item_id = $item_data['item_id'];
 				$new_item = TRUE;
-			}
-			else //previous item
-			{
-				echo json_encode(array('success'=>true,'message'=>$this->lang->line('items_successful_updating').' '.
-				$item_data['name'],'item_id'=>$item_id));
 			}
 			
 			$items_taxes_data = array();
@@ -361,7 +387,7 @@ class Items extends Secure_area implements iData_controller
 					$items_taxes_data[] = array('name'=>$tax_names[$k], 'percent'=>$tax_percents[$k] );
 				}
 			}
-			$this->Item_taxes->save($items_taxes_data, $item_id);
+			$success &= $this->Item_taxes->save($items_taxes_data, $item_id);
 
             
             //Save item quantity
@@ -375,7 +401,7 @@ class Items extends Secure_area implements iData_controller
                 $item_quantity = $this->Item_quantities->get_item_quantity($item_id, $location_data['location_id']);
                 if ($item_quantity->quantity != $updated_quantity || $new_item) 
                 {              
-	                $this->Item_quantities->save($location_detail, $item_id, $location_data['location_id']);
+	                $success &= $this->Item_quantities->save($location_detail, $item_id, $location_data['location_id']);
 	                
 	                $inv_data = array
 	                (
@@ -386,16 +412,56 @@ class Items extends Secure_area implements iData_controller
 	                    'trans_comment'=>$this->lang->line('items_manually_editing_of_quantity'),
 	                    'trans_inventory'=>$updated_quantity - $item_quantity->quantity
 	                );
-	                $this->Inventory->insert($inv_data);       
+	                $success &= $this->Inventory->insert($inv_data);       
                 }                                            
             }        
+            
+            if ($success && $upload_success) 
+            {
+            	$success_message = $this->lang->line('items_successful_' . ($new_item ? 'adding' : 'updating')) .' '. $item_data['name'];
+            	echo json_encode(array('success'=>true,'message'=>$success_message,'item_id'=>$item_id));
+            }
+            else
+            {
+            	$error_message = $upload_success ? 
+	            	$this->lang->line('items_error_adding_updating') .' '. $item_data['name'] : 
+    	        	$this->upload->display_errors(); 
+            	echo json_encode(array('success'=>false,
+            			'message'=>$error_message,'item_id'=>$item_id)); 
+            }
+            
 		}
 		else//failure
 		{
-			echo json_encode(array('success'=>false,'message'=>$this->lang->line('items_error_adding_updating').' '.
-			$item_data['name'],'item_id'=>-1));
+			echo json_encode(array('success'=>false,
+					'message'=>$this->lang->line('items_error_adding_updating').' '
+					.$item_data['name'],'item_id'=>-1));
 		}
 
+	}
+	
+	function check_item_number()
+	{
+		$exists = $this->Item->item_number_exists($this->input->post('item_number'),$this->input->post('item_id'));
+		echo json_encode(array('success'=>!$exists,'message'=>$this->lang->line('items_item_number_duplicate')));
+	}
+	
+	function _handle_image_upload()
+	{
+		$this->load->helper('directory');
+		$map = directory_map('./uploads/item_pics/', 1);
+		// load upload library
+		$config = array('upload_path' => './uploads/item_pics/',
+				'allowed_types' => 'gif|jpg|png',
+				'max_size' => '100',
+				'max_width' => '640',
+				'max_height' => '480',
+				'file_name' => sizeof($map));
+		$this->load->library('upload', $config);
+		$this->upload->do_upload('item_image');            
+		return strlen($this->upload->display_errors()) == 0 || 
+            	!strcmp($this->upload->display_errors(), 
+            		'<p>'.$this->lang->line('upload_no_file_selected').'</p>');
 	}
 	
 	//Ramel Inventory Tracking
@@ -448,7 +514,7 @@ class Items extends Secure_area implements iData_controller
 			{
 				$item_data["$key"]=$value == '' ? null : $value;
 			}
-			elseif($value!='' and !(in_array($key, array('item_ids', 'tax_names', 'tax_percents'))))
+			elseif($value!='' and !(in_array($key, array('item_ids', 'tax_names', 'tax_percents', 'category'))))
 			{
 				$item_data["$key"]=$value;
 			}
@@ -504,156 +570,154 @@ class Items extends Secure_area implements iData_controller
 		$this->load->view("items/excel_import", null);
 	}
 
-	function do_excel_import()
-	{
-		$msg = 'do_excel_import';
-		$failCodes = array();
-		if ($_FILES['file_path']['error']!=UPLOAD_ERR_OK)
+    function do_excel_import()
+    {
+        $msg = 'do_excel_import';
+        $failCodes = array();
+        if ($_FILES['file_path']['error']!=UPLOAD_ERR_OK)
+        {
+            $msg = $this->lang->line('items_excel_import_failed');
+            echo json_encode( array('success'=>false,'message'=>$msg) );
+            return;
+        }
+        else
 		{
-			$msg = $this->lang->line('items_excel_import_failed');
-			echo json_encode( array('success'=>false,'message'=>$msg) );
-			return;
-		}
-		else
-		{
-			if (($handle = fopen($_FILES['file_path']['tmp_name'], "r")) !== FALSE)
-			{
-				//Skip first row
-				fgetcsv($handle);
-				
-				$i=1;
-				while (($data = fgetcsv($handle)) !== FALSE)
-				{
-                                    
-					$item_data = array(
-					'name'			=>	$data[1],
-					'description'	=>	$data[11],
-					'category'		=>	$data[2],
-					'cost_price'	=>	$data[4],
-					'unit_price'	=>	$data[5],
-					'reorder_level'	=>	$data[10],
-					'supplier_id'	=>  $this->Supplier->exists($data[3]) ? $data[3] : null,
-					'allow_alt_description'	=>	$data[12] != '' ? '1' : '0',
-					'is_serialized'	=>	$data[13] != '' ? '1' : '0',
-					'custom1'		=>	$data[14],	/** GARRISON ADDED 5/6/2013 **/
-					'custom2'		=>	$data[15],	/** GARRISON ADDED 5/6/2013 **/
-					'custom3'		=>	$data[16],	/** GARRISON ADDED 5/6/2013 **/
-					'custom4'		=>	$data[17],	/** GARRISON ADDED 5/6/2013 **/
-					'custom5'		=>	$data[18],	/** GARRISON ADDED 5/6/2013 **/
-					'custom6'		=>	$data[19],	/** GARRISON ADDED 5/6/2013 **/
-					'custom7'		=>	$data[20],	/** GARRISON ADDED 5/6/2013 **/
-					'custom8'		=>	$data[21],	/** GARRISON ADDED 5/6/2013 **/
-					'custom9'		=>	$data[22],	/** GARRISON ADDED 5/6/2013 **/
-					'custom10'		=>	$data[23]	/** GARRISON ADDED 5/6/2013 **/
-					);
-					$item_number = $data[0];
-					
-					if ($item_number != "")
-					{
-						$item_data['item_number'] = $item_number;
+            if (($handle = fopen($_FILES['file_path']['tmp_name'], "r")) !== FALSE)
+            {
+                //Skip first row
+                fgetcsv($handle);
+
+                $i=1;
+                while (($data = fgetcsv($handle)) !== FALSE)
+                {
+					if (sizeof($data) >= 23) {
+	                    $item_data = array(
+	                        'name'			=>	$data[1],
+	                        'description'	=>	$data[11],
+	                        'category'		=>	$data[2],
+	                        'cost_price'	=>	$data[4],
+	                        'unit_price'	=>	$data[5],
+	                        'reorder_level'	=>	$data[10],
+	                        'supplier_id'	=>  $this->Supplier->exists($data[3]) ? $data[3] : null,
+	                        'allow_alt_description'	=>	$data[12] != '' ? '1' : '0',
+	                        'is_serialized'	=>	$data[13] != '' ? '1' : '0',
+	                        'custom1'		=>	$data[14],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom2'		=>	$data[15],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom3'		=>	$data[16],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom4'		=>	$data[17],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom5'		=>	$data[18],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom6'		=>	$data[19],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom7'		=>	$data[20],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom8'		=>	$data[21],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom9'		=>	$data[22],	/** GARRISON ADDED 5/6/2013 **/
+	                        'custom10'		=>	$data[23]	/** GARRISON ADDED 5/6/2013 **/
+	                    );
+	                    $item_number = $data[0];
+	                    if ($item_number != "")
+	                    {
+	                    	$item_data['item_number'] = $item_number;
+	                    }
+	                    $invalidated = $this->Item->item_number_exists($item_number);
 					}
-					
-					if($this->Item->save($item_data)) 
+					else 
 					{
-						$items_taxes_data = null;
-						//tax 1
-						if( is_numeric($data[7]) && $data[6]!='' )
-						{
-							$items_taxes_data[] = array('name'=>$data[6], 'percent'=>$data[7] );
-						}
-
-						//tax 2
-						if( is_numeric($data[9]) && $data[8]!='' )
-						{
-							$items_taxes_data[] = array('name'=>$data[8], 'percent'=>$data[9] );
-						}
-
-						// save tax values
-						if(count($items_taxes_data) > 0)
-						{
-							$this->Item_taxes->save($items_taxes_data, $item_data['item_id']);
-						}
-                                                
-                                                // quantities   & inventory Info
-                                                $employee_id=$this->Employee->get_logged_in_employee_info()->person_id;
-												$emp_info=$this->Employee->get_info($employee_id);
-                                                $comment ='Qty CSV Imported';
-                                                                                             
-                                                $cols = count($data);
-												
-												// array to store information if location got a quantity
-												$quantity_added_to_location = array();
-												foreach($this->Stock_locations->get_location_ids_as_array() as $loction_id)
-												{
-													$quantity_added_to_location[$location_id] = false;
-												}
-                                                for ($col = 24; $col < $cols; $col = $col + 2)
-                                                {
-                                                    $item_quantity_data = array(
-                                                        'item_id' => $item_data['item_id'],
-                                                        'location_id' => $data[$col],
-                                                        'quantity' => $data[$col + 1],
-                                                    );
-                                                    $this->Item_quantities->save($item_quantity_data, $item_data['item_id'], $data[$col]);
-													
-													$excel_data = array
-																	(
-																	'trans_items'=>$item_data['item_id'],
-																	'trans_user'=>$employee_id,
-																	'trans_comment'=>$comment,
-																	'trans_location'=>$data[$col],
-																	'trans_inventory'=>$data[$col + 1]
-																	);
-													$this->db->insert('inventory',$excel_data);
-
-													$quantity_added_to_location[$data[$col]] = true;
-                                                }
-
-												/*
-												 * now iterate through the array and check for which location_id no entry into item_quantities was made yet
-												 * those get an entry with quantity as 0.
-												 * unfortunately a bit duplicate code from above...
-												 */
-												foreach($quantity_added_to_location as $location_id => $added)
-												{
-													if($added === false)
-													{
-														$item_quantity_data = array(
-	                                                        'item_id' => $item_data['item_id'],
-	                                                        'location_id' => $location_id,
-	                                                        'quantity' => 0,
-	                                                    );
-	                                                    $this->Item_quantities->save($item_quantity_data, $item_data['item_id'], $data[$col]);
-														
-														$excel_data = array
-																		(
-																		'trans_items'=>$item_data['item_id'],
-																		'trans_user'=>$employee_id,
-																		'trans_comment'=>$comment,
-																		'trans_location'=>$location_id,
-																		'trans_inventory'=>0
-																		);
-														$this->db->insert('inventory',$excel_data);
-													}
-												}
+						$invalidated = true;
 					}
-					else//insert or update item failure
-					{
-						$failCodes[] = $i;
-					}
-				}
-				
-				$i++;
-			}
-			else 
-			{
-				echo json_encode( array('success'=>false,'message'=>'Your upload file has no data or not in supported format.') );
-				return;
-			}
-		}
+                    if(!$invalidated && $this->Item->save($item_data)) 
+                    {
+                        $items_taxes_data = null;
+                        //tax 1
+                        if( is_numeric($data[7]) && $data[6]!='' )
+                        {
+                            $items_taxes_data[] = array('name'=>$data[6], 'percent'=>$data[7] );
+                        }
+
+                        //tax 2
+                        if( is_numeric($data[9]) && $data[8]!='' )
+                        {
+                            $items_taxes_data[] = array('name'=>$data[8], 'percent'=>$data[9] );
+                        }
+
+                        // save tax values
+                        if(count($items_taxes_data) > 0)
+                        {
+                            $this->Item_taxes->save($items_taxes_data, $item_data['item_id']);
+                        }
+
+                        // quantities   & inventory Info
+                        $employee_id=$this->Employee->get_logged_in_employee_info()->person_id;
+                        $emp_info=$this->Employee->get_info($employee_id);
+                        $comment ='Qty CSV Imported';
+
+                        $cols = count($data);
+
+                        // array to store information if location got a quantity
+                        $allowed_locations = $this->Stock_locations->get_allowed_locations();
+                        for ($col = 24; $col < $cols; $col = $col + 2)
+                        {
+                            $location_id = $data[$col];
+                            if (array_key_exists($location_id, $allowed_locations))
+                            {
+                                $item_quantity_data = array (
+                                    'item_id' => $item_data['item_id'],
+                                    'location_id' => $location_id,
+                                    'quantity' => $data[$col + 1],
+                                );
+                                $this->Item_quantities->save($item_quantity_data, $item_data['item_id'], $data[$col]);
+
+                                $excel_data = array (
+                                    'trans_items'=>$item_data['item_id'],
+                                    'trans_user'=>$employee_id,
+                                    'trans_comment'=>$comment,
+                                    'trans_location'=>$data[$col],
+                                    'trans_inventory'=>$data[$col + 1]
+                                );
+                                $this->Inventory->insert($excel_data);
+                                unset($allowed_locations[$location_id]);
+                            }
+                        }
+
+                        /*
+                         * now iterate through the array and check for which location_id no entry into item_quantities was made yet
+                         * those get an entry with quantity as 0.
+                         * unfortunately a bit duplicate code from above...
+                         */
+                        foreach($allowed_locations as $location_id => $location_name)
+                        {
+                            $item_quantity_data = array(
+                                'item_id' => $item_data['item_id'],
+                                'location_id' => $location_id,
+                                'quantity' => 0,
+                            );
+                            $this->Item_quantities->save($item_quantity_data, $item_data['item_id'], $data[$col]);
+
+                            $excel_data = array
+                                (
+                                    'trans_items'=>$item_data['item_id'],
+                                    'trans_user'=>$employee_id,
+                                    'trans_comment'=>$comment,
+                                    'trans_location'=>$location_id,
+                                    'trans_inventory'=>0
+                                );
+                            $this->db->insert('inventory',$excel_data);
+                        }
+                    }
+                    else//insert or update item failure
+                    {
+                        $failCodes[] = $i;
+                    }
+                }
+                $i++;
+            }
+            else 
+            {
+                echo json_encode( array('success'=>false,'message'=>'Your upload file has no data or not in supported format.') );
+                return;
+            }
+        }
 
 		$success = true;
-		if(count($failCodes) > 1)
+		if(count($failCodes) > 0)
 		{
 			$msg = "Most items imported. But some were not, here is list of their CODE (" .count($failCodes) ."): ".implode(", ", $failCodes);
 			$success = false;
@@ -671,17 +735,7 @@ class Items extends Secure_area implements iData_controller
 	*/
 	function get_form_width()
 	{
-		return 360;
-	}
-    
-	function item_number_check($item_number)
-	{
-		if ($this->Item->get_item_id($item_number) != FALSE)
-		{
-			$this->form_validation->set_message('item_number_check', $this->lang->line('items_item_number_exists'));
-			echo json_encode(array('success'=>false,'message'=>$this->lang->line('items_error_adding')));
-		}
-		echo json_encode(array('success'=>true,'message'=>$this->lang->line('items_successful_adding')));
+		return 400;
 	}
     
 }

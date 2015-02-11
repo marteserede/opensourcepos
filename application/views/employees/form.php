@@ -2,7 +2,7 @@
 echo form_open('employees/save/'.$person_info->person_id,array('id'=>'employee_form'));
 ?>
 <div id="required_fields_message"><?php echo $this->lang->line('common_fields_required_message'); ?></div>
-<ul id="error_message_box"></ul>
+<ul id="error_message_box" class="error_message_box"></ul>
 <fieldset id="employee_basic_info">
 <legend><?php echo $this->lang->line("employees_basic_information"); ?></legend>
 <?php $this->load->view("people/form_basic_info"); ?>
@@ -173,7 +173,6 @@ $(document).ready(function()
 						    {
 							    has_children = true;
 							    checked |= $(this).is(":checked");
-			            		console.log("checking.. "  + $(this).val() + "  required " + checked);
 						    });
 						    if (has_children && !checked) 
 							{
@@ -181,7 +180,6 @@ $(document).ready(function()
 							}
 						}
             		});
-            		console.log("returning " + !checked);
 					return !checked; 
         		},
         		minlength: 1
