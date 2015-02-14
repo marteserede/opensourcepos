@@ -458,7 +458,10 @@ class Items extends Secure_area implements iData_controller
 				'max_height' => '480',
 				'file_name' => sizeof($map));
 		$this->load->library('upload', $config);
-		$this->upload->do_upload('item_image');            
+		if(!isset($_FILES['item_image'])){
+			return true;
+		}
+		$this->upload->do_upload('item_image');
 		return strlen($this->upload->display_errors()) == 0 || 
             	!strcmp($this->upload->display_errors(), 
             		'<p>'.$this->lang->line('upload_no_file_selected').'</p>');
