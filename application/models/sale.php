@@ -289,13 +289,11 @@ class Sale extends CI_Model
 			$this->db->insert('sales_items',$sales_items_data);
 
 			//Update stock quantity
-			$item_quantity = $this->Item_quantities->get_item_quantity($item['item_id'], $item['item_location']);       
-			$this->Item_quantities->save(array('quantity'=>$item_quantity->quantity - $item['quantity'],
+			$item_quantity = $this->Item_quantity->get_item_quantity($item['item_id'], $item['item_location']);
+			$this->Item_quantity->save(array('quantity'=>$item_quantity->quantity - $item['quantity'],
                                               'item_id'=>$item['item_id'],
                                               'location_id'=>$item['item_location']), $item['item_id'], $item['item_location']);
-	
-			
-			//Ramel Inventory Tracking
+
 			//Inventory Count Details
 			$qty_buy = -$item['quantity'];
 			$sale_remarks ='POS '.$sale_id;
@@ -309,7 +307,6 @@ class Sale extends CI_Model
 				'trans_inventory'=>$qty_buy
 			);
 			$this->Inventory->insert($inv_data);
-			//------------------------------------Ramel
 
 			$customer = $this->Customer->get_info($customer_id);
  			if ($customer_id == -1 or $customer->taxable)
@@ -374,7 +371,7 @@ class Sale extends CI_Model
 				$this->Inventory->insert($inv_data);
 
 				// update quantities
-				$this->Item_quantities->change_quantity($item['item_id'],
+				$this->Item_quantity->change_quantity($item['item_id'],
 					$item['item_location'],
 					$item['quantity_purchased']);
 			}
